@@ -9,19 +9,21 @@ us = {}
 orders_passengers = {}
 orders_drivers = {}
 already_find = {}
+label_test = 0
 
 
 class user():
-    def __init__(self, role, id, start, finish):
+    def __init__(self, role, id, start, finish, label_test):
         self.id = id
         self.role = role
         self.start = start
         self.finish = finish
+        self.label_test = label_test
 
 
 @bot.message_handler(commands=['start'])
 def message_handler_st(message):
-    if message.chat.id not in us:
+    if message.chat.id not in us or label_test:
         bot.send_message(message.chat.id, "Привет, я тестовый бот, попробую организовать функционал перевозки пассажиров "
                                       "между городами. \nНе вижу у вас открытых заказов :) \nДля начала определимся водитель ли вы или пассажир?", reply_markup=gen_markup_role())
     else:
@@ -39,9 +41,19 @@ def message_handler_inf(message):
     bot.send_message(message.chat.id, log[1])
 
 
+@bot.message_handler(commands=['cancel'])
+def message_handler_inf(message):
+    if message.chat.id not in us:
+        bot.send_message(message.chat.id, "Насколько нам известно у вас отсутсвуют активные заказы!")
+    else:
+        delete_order(message)
+        bot.send_message(message.chat.id, "Сделано!")
+
+
+
 @bot.message_handler(content_types=['text'])
 def message_handler_bla(message):
-    bot.send_message(message.chat.id, "Я вас не понимаю! Используйте команду /start для начала работы или /inform для получения информации по вашему заказу!")
+    bot.send_message(message.chat.id, "Я вас не понимаю! Используйте команду /start для начала работы или /inform для получения информации по вашему заказу или /cancel для отмены заказа!")
 
 def message_handler(message):
     information(message)
@@ -89,13 +101,14 @@ def callback_query(call):
     elif call.data == "cb_order":
         check_order(call)
     elif call.data == "cb_del_order":
-        delete_order(call)
+        delete_order(call.message)
+        bot.answer_callback_query(call.id, "Сделано!")
     elif call.data == "cb_no_order":
         bot.answer_callback_query(call.id, "Хорошо, приятного тыкания )")
 
 
 def add_driver(call):
-    us[call.message.chat.id] = user(0, call.message.chat.id, "венера", "юпитер")
+    us[call.message.chat.id] = user(0, call.message.chat.id, "венера", "юпитер", 0)
     bot.answer_callback_query(call.id, "Запомню")
     msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
     bot.register_next_step_handler(msg, new_order_driver)
@@ -116,7 +129,7 @@ def new_order_driver(message):
 
 
 def add_passenger(call):
-    us[call.message.chat.id] = user(1, call.message.chat.id, "юпитер", "венера")
+    us[call.message.chat.id] = user(1, call.message.chat.id, "юпитер", "венера", 0)
     bot.answer_callback_query(call.id, "Запомню")
     msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
     bot.register_next_step_handler(msg, new_order_passenger)
@@ -145,7 +158,7 @@ def is_there(route, id):
     if id in already_find:
         return (1, get_inform(id))
 
-    if route not in orders_drivers:
+    if route not in orders_drivers or len(orders_drivers[route]) == 0:
         return (0, "К сожалению водитель пока не нашелся : (")
     elif route not in orders_passengers:
         return (0, "Недостаточно пассажиров, осталось найти 4")
@@ -162,8 +175,8 @@ def get_inform(id):
         return "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[id])))
 
 
-def delete_order(call):
-    id = call.message.chat.id
+def delete_order(message):
+    id = message.chat.id
     route = (us[id].start, us[id].finish)
 
     if us[id].role == 0:
@@ -202,17 +215,17 @@ def delete_order(call):
     while may_build_trip(route):
         build_trip(route)
 
-    bot.answer_callback_query(call.id, "Сделано!")
-
 
 def inform_about_delete_of_driver(whom):
-	for v in whom:
-		bot.send_message(v, "Водитель отказался от поездки, ищем нового")
+    for v in whom:
+        if not us[v].label_test:
+            bot.send_message(v, "Водитель отказался от поездки, ищем нового")
 
 
 def inform_about_delete_of_passenger(whom):
     for v in whom:
-	    bot.send_message(v, "Один из пассажиров отказался от поездки, ищем нового")
+        if not us[v].label_test:
+            bot.send_message(v, "Один из пассажиров отказался от поездки, ищем нового")
 
 
 def may_build_trip(route):
@@ -222,7 +235,7 @@ def may_build_trip(route):
     return len(orders_drivers[route]) >= 1 and len(orders_passengers[route]) >= 4
 
 
-def build_trip(route):	
+def build_trip(route):  
     dr = orders_drivers[route][0].id
     orders_drivers[route].pop(0)
     ps1 = orders_passengers[route][0].id
@@ -237,9 +250,33 @@ def build_trip(route):
     already_find[dr] = [ps1, ps2, ps3, ps4]
     already_find[ps1] = already_find[ps2] = already_find[ps3] = already_find[ps4] = [dr]
 
-    bot.send_message(dr, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(list(map(str, already_find[id]))))
+    if not us[dr].label_test:
+        bot.send_message(dr, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(list(map(str, already_find[dr]))))
+    
     for v in already_find[dr]:
-        bot.send_message(v, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[id]))))
+        if not us[v].label_test:
+            bot.send_message(v, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[v]))))
 
-			
+
+def add_test(kek):
+    us[kek.id] = kek
+    st, fn = us[kek.id].start, us[kek.id].finish
+
+    if us[kek.id].role == 1:
+        if (st, fn) in orders_passengers:
+            orders_passengers[(st, fn)].append(kek)
+        else:
+            orders_passengers[(st, fn)] = [kek]
+    else:
+        if (st, fn) in orders_drivers:
+            orders_drivers[(st, fn)].append(kek)
+        else:
+            orders_drivers[(st, fn)] = [kek]
+
+            
+#add_test(user(1, 0, 'a', 'a', 1))
+#add_test(user(1, 1, 'a', 'a', 1))
+#add_test(user(1, 2, 'a', 'a', 1))
+#add_test(user(1, 3, 'a', 'a', 1))
+
 bot.polling(none_stop=True, interval=0)
