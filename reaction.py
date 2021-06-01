@@ -1,16 +1,20 @@
 import interaction
-from interaction import InlineKeyboardMarkup, InlineKeyboardButton, is_there, delete_order, add_driver, add_passenger, check_order
+import telebot
+from telebot import types
+from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+from interaction import Queue, User, convert_to_route
 
-bot = interaction.bot
-us = interaction.us
-orders_passengers = interaction.orders_passengers
-orders_drivers = interaction.orders_drivers
-already_find = interaction.already_find
+
+
+bot = bot = telebot.TeleBot('1738728282:AAHfH-31hY0DXNlrPmb_JMv9Ao9Quzr5Jfo')
+q = interaction.q
 
 
 @bot.message_handler(commands=['start'])
 def message_handler_st(message):
-    if message.chat.id not in us:
+    print_all_messages()
+
+    if not q.is_order(message.chat.id):
         bot.send_message(message.chat.id,
                          "Привет, я тестовый бот, попробую организовать функционал перевозки пассажиров "
                          "между городами. \nНе вижу у вас открытых заказов :) \nДля начала определимся водитель ли вы или пассажир?",
@@ -20,30 +24,39 @@ def message_handler_st(message):
                          "Рады вас снова видеть, хотите уточнить детали ваших поездок?",
                          reply_markup=gen_markup_check_order())
 
+    print_all_messages()
+
 
 @bot.message_handler(commands=['inform'])
 def message_handler_inform(message):
-    if message.chat.id not in us:
-        log = (0, "Насколько нам известно у вас отсутсвуют активные заказы!")
-    else:
-        log = is_there((us[message.chat.id].start, us[message.chat.id].finish), message.chat.id)
-
-    bot.send_message(message.chat.id, log[1])
+    q.is_there(message.chat.id)
+    print_all_messages()
 
 
 @bot.message_handler(commands=['cancel'])
 def message_handler_cancel(message):
-    if message.chat.id not in us:
+    print_all_messages()
+    if not q.is_order(message.chat.id):
         bot.send_message(message.chat.id, "Насколько нам известно у вас отсутсвуют активные заказы!")
     else:
-        delete_order(message)
+        q.delete_order(message.chat.id)
         bot.send_message(message.chat.id, "Сделано!")
+
+    print_all_messages()
 
 
 @bot.message_handler(content_types=['text'])
 def message_handler_any_message(message):
+    print_all_messages()
     bot.send_message(message.chat.id,
                      "Я вас не понимаю! Используйте команду /start для начала работы или /inform для получения информации по вашему заказу или /cancel для отмены заказа!")
+
+
+def print_all_messages():
+    while q.is_there_message():
+        mes = q.get_first_message()
+        q.pop_first_message()
+        bot.send_message(mes[1], mes[2])
 
 
 def gen_markup_role():
@@ -75,12 +88,48 @@ def gen_markup_check_order():
 def callback_query(call):
     if call.data == "cb_driver":
         add_driver(call)
+        print_all_messages()
     elif call.data == "cb_passenger":
         add_passenger(call)
     elif call.data == "cb_order":
         check_order(call)
+        print_all_messages()
     elif call.data == "cb_del_order":
-        delete_order(call.message)
+        q.delete_order(call.message.chat.id)
         bot.answer_callback_query(call.id, "Сделано!")
+        print_all_messages()
     elif call.data == "cb_no_order":
         bot.answer_callback_query(call.id, "Хорошо, приятного тыкания )")
+
+
+def check_order(id):
+    q.is_there(id)
+    bot.answer_callback_query(id, "Готово")
+
+
+def add_driver(call):
+    bot.answer_callback_query(call.id, "Запомню")
+    print_all_messages()
+    msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
+    bot.register_next_step_handler(msg, new_order_driver)
+
+
+def new_order_driver(message):
+    q.add_driver(User(0, message.chat.id, convert_to_route(message.text)))
+    print_all_messages()
+    msg = bot.send_message(message.chat.id, "Ваш заказ зарегистрирован! Пожалуйста проверяйте статус заказа!")
+    print_all_messages()
+
+
+def add_passenger(call):
+    bot.answer_callback_query(call.id, "Запомню")
+    print_all_messages()
+    msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
+    bot.register_next_step_handler(msg, new_order_passenger)
+
+
+def new_order_passenger(message):
+    q.add_passenger(User(1, message.chat.id, convert_to_route(message.text)))
+    print_all_messages()
+    msg = bot.send_message(message.chat.id, "Ваш заказ зарегистрирован! Пожалуйста проверяйте статус заказа!")
+    print_all_messages()
