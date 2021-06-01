@@ -6,7 +6,7 @@ from interaction import Queue, User, convert_to_route
 
 
 
-bot = bot = telebot.TeleBot('1738728282:AAHfH-31hY0DXNlrPmb_JMv9Ao9Quzr5Jfo')
+bot = telebot.TeleBot('')
 q = interaction.q
 
 
