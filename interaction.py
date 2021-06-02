@@ -1,52 +1,63 @@
 class User():
     def __init__(self, role, id, route):
-        self.id = id
-        self.role = role
-        self.route = route
+        self.__id = id
+        self.__role = role
+        self.__route = route
+
+    def get_id(self):
+        return self.__id
+
+    def get_route(self):
+        return self.__route
+
+    def get_role(self):
+        return self.__role
 
 
-class Queue():
+
+class Queue_of_orders():
     def __init__(self, used, orders_passengers, orders_drivers, already_find, stack_of_messages):
-        self.used = used
-        self.orders_passengers = orders_passengers
-        self.orders_drivers = orders_drivers
-        self.already_find = already_find
-        self.stack_of_messages = stack_of_messages
+        self.__used = used
+        self.__orders_passengers = orders_passengers
+        self.__orders_drivers = orders_drivers
+        self.__already_find = already_find
+        self.__stack_of_messages = stack_of_messages
+        self.__CONST_NUMBER_PLACES = 4
 
 
     def add_driver(self, us):
-        self.used[us.id] = us
+        self.__used[us.get_id()] = us
 
-        if us.route in self.orders_drivers:
-            self.orders_drivers[us.route].append(us)
+        if us.get_route() in self.__orders_drivers:
+            self.__orders_drivers[us.get_route()].append(us)
         else:
-            self.orders_drivers[us.route] = [us]
+            self.__orders_drivers[us.get_route()] = [us]
 
-        while q.may_build_trip(us.id):
-            q.build_trip(us.id)
+        while q.may_build_trip(us.get_id()):
+            q.build_trip(us.get_id())
 
 
     def add_passenger(self, us):
-        self.used[us.id] = us
+        self.__used[us.get_id()] = us
 
-        if us.route in self.orders_passengers:
-            self.orders_passengers[us.route].append(us)
+        if us.get_route() in self.__orders_passengers:
+            self.__orders_passengers[us.get_route()].append(us)
         else:
-            self.orders_passengers[us.route] = [us]
+            self.__orders_passengers[us.get_route()] = [us]
 
-        while q.may_build_trip(us.id):
-            q.build_trip(us.id)
+        while q.may_build_trip(us.get_id()):
+            q.build_trip(us.get_id())
 
 
     def get_inform(self, id):
-        if self.used[id].role == 0:
-            self.stack_of_messages.append((1, id, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(list(map(str, already_find[id])))))
+        if self.__used[id].get_role() == 0:
+            self.__stack_of_messages.append((1, id, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(list(map(str, already_find[id])))))
         else:
-            self.stack_of_messages.append((1, id, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[id])))))
+            self.__stack_of_messages.append((1, id, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[id])))))
 
 
     def is_order(self, id):
-        if id not in self.used:
+        if id not in self.__used:
             return 0
         else:
             return 1
@@ -54,68 +65,68 @@ class Queue():
 
     def is_there(self, id):
         if not self.is_order(id):
-            self.stack_of_messages.append((0, id, "Насколько нам известно у вас отсутсвуют активные заказы!"))
+            self.__stack_of_messages.append((0, id, "Насколько нам известно у вас отсутсвуют активные заказы!"))
             return
 
-        if id in self.already_find:
+        if id in self.__already_find:
             self.get_inform(id);
             return
 
-        route = self.used[id].route
-        if route not in self.orders_drivers or len(self.orders_drivers[route]) == 0:
-            self.stack_of_messages.append((0, id, "К сожалению водитель пока не нашелся : ("))
-        elif route not in self.orders_passengers:
-            self.stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти 4"))
-        elif len(self.orders_passengers[route]) != 4:
-            self.stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти " + str(4 - len(self.orders_passengers[route]))))
+        route = self.__used[id].get_route()
+        if route not in self.__orders_drivers or len(self.__orders_drivers[route]) == 0:
+            self.__stack_of_messages.append((0, id, "К сожалению водитель пока не нашелся : ("))
+        elif route not in self.__orders_passengers:
+            self.__stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти " + str(self.__CONST_NUMBER_PLACES)))
+        elif len(self.__orders_passengers[route]) != self.__CONST_NUMBER_PLACES:
+            self.__stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти " + str(self.__CONST_NUMBER_PLACES - len(self.__orders_passengers[route]))))
 
 
     def inform_about_delete_of_driver(self, whom):
         for v in whom:
-            self.stack_of_messages.append((0, v, "Водитель отказался от поездки, ищем нового"))
+            self.__stack_of_messages.append((0, v, "Водитель отказался от поездки, ищем нового"))
 
 
     def inform_about_delete_of_passenger(self, whom):
         for v in whom:
-            self.stack_of_messages.append((0, v, "Один из пассажиров отказался от поездки, ищем нового"))
+            self.__stack_of_messages.append((0, v, "Один из пассажиров отказался от поездки, ищем нового"))
 
 
     def delete_order(self, id):
-        route = self.used[id].route
+        route = self.__used[id].get_route()
 
-        if self.used[id].role == 0:
-            if id in self.already_find:
-                self.inform_about_delete_of_driver(self.already_find[id])
+        if self.__used[id].get_role() == 0:
+            if id in self.__already_find:
+                self.inform_about_delete_of_driver(self.__already_find[id])
 
-                for id_pas in self.already_find[id]:
-                    self.orders_passengers[route].append(self.used[id_pas])
-                    self.already_find.pop(id_pas, None)
+                for id_pas in self.__already_find[id]:
+                    self.__orders_passengers[route].append(self.__used[id_pas])
+                    self.__already_find.pop(id_pas, None)
 
-                self.already_find.pop(id, None)
-                self.used.pop(id, None)
+                self.__already_find.pop(id, None)
+                self.__used.pop(id, None)
             else:
-                self.orders_drivers[route].pop(self.orders_drivers[route].index(self.used[id]))
-                self.used.pop(id, None)
+                self.__orders_drivers[route].pop(self.__orders_drivers[route].index(self.__used[id]))
+                self.__used.pop(id, None)
         else:
-            if id in self.already_find:
-                fl = self.already_find[self.already_find[id][0]][::]
+            if id in self.__already_find:
+                fl = self.__already_find[self.__already_find[id][0]][::]
                 fl.pop(fl.index(id))
-                fl.append(self.already_find[id][0])
+                fl.append(self.__already_find[id][0])
                 self.inform_about_delete_of_passenger(fl)
 
-                id_dr = self.already_find[id][0]
-                for id_pas in self.already_find[id_dr]:
+                id_dr = self.__already_find[id][0]
+                for id_pas in self.__already_find[id_dr]:
                     if id_pas != id:
-                        self.orders_passengers[route].append(self.used[id_pas])
+                        self.__orders_passengers[route].append(self.__used[id_pas])
 
-                    self.already_find.pop(id_pas, None)
+                    self.__already_find.pop(id_pas, None)
 
-                self.already_find.pop(id_dr, None)
-                self.orders_drivers[route].append(self.used[id_dr])
-                self.used.pop(id, None)
+                self.__already_find.pop(id_dr, None)
+                self.__orders_drivers[route].append(self.__used[id_dr])
+                self.__used.pop(id, None)
             else:
-                self.orders_passengers[route].pop(self.orders_passengers[route].index(self.used[id]))
-                self.used.pop(id, None)
+                self.__orders_passengers[route].pop(self.__orders_passengers[route].index(self.__used[id]))
+                self.__used.pop(id, None)
 
         while q.may_build_trip(id):
             q.build_trip(id)
@@ -125,52 +136,49 @@ class Queue():
         if not self.is_order(id):
             return 0
 
-        route = self.used[id].route
-        if route not in self.orders_drivers or route not in self.orders_passengers:
+        route = self.__used[id].get_route()
+        if route not in self.__orders_drivers or route not in self.__orders_passengers:
             return 0
 
-        return len(self.orders_drivers[route]) >= 1 and len(self.orders_passengers[route]) >= 4
+        return len(self.__orders_drivers[route]) and len(self.__orders_passengers[route]) >= self.__CONST_NUMBER_PLACES
 
 
     def build_trip(self, id):
-        route = self.used[id].route
-        dr = self.orders_drivers[route][0].id
-        self.orders_drivers[route].pop(0)
-        ps1 = self.orders_passengers[route][0].id
-        self.orders_passengers[route].pop(0)
-        ps2 = self.orders_passengers[route][0].id
-        self.orders_passengers[route].pop(0)
-        ps3 = self.orders_passengers[route][0].id
-        self.orders_passengers[route].pop(0)
-        ps4 = self.orders_passengers[route][0].id
-        self.orders_passengers[route].pop(0)
+        route = self.__used[id].get_route()
 
-        self.already_find[dr] = [ps1, ps2, ps3, ps4]
-        self.already_find[ps1] = self.already_find[ps2] = self.already_find[ps3] = self.already_find[ps4] = [dr]
+        driver = self.__orders_drivers[route][0].id
+        self.__orders_drivers[route].pop(0)
 
-        if not self.used[dr].label_test:
-            self.stack_of_messages.append((1, dr, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(
-                list(map(str, self.already_find[dr])))))
+        list_of_pasengers = []
+        for i in range(self.__CONST_NUMBER_PLACES):
+            list_of_pasengers.append(self.__orders_passengers[route][0].id)
+            self.__orders_passengers[route].pop(0)
 
-        for v in self.already_find[dr]:
-            if not self.used[v].label_test:
-                self.stack_of_messages.append((1, v, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(
-                                     list(map(str, self.already_find[v])))))
+        self.__already_find[driver] = list_of_pasengers
+        for v in list_of_pasengers:
+            self.__already_find[v] = [driver]
+
+
+        self.__stack_of_messages.append((1, driver, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(
+            list(map(str, list_of_pasengers)))))
+
+        for v in list_of_pasengers:
+            self.__stack_of_messages.append((1, v, "Водитель нашелся, ниже приложен его номер\n" + str(driver)))
 
 
     def is_there_message(self):
-        return len(self.stack_of_messages) >= 1
+        return len(self.__stack_of_messages) >= 1
 
 
     def get_first_message(self):
-        return self.stack_of_messages[0]
+        return self.__stack_of_messages[0]
 
 
     def pop_first_message(self):
-        self.stack_of_messages.pop(0)
+        self.__stack_of_messages.pop(0)
 
 
-q = Queue({}, {}, {}, {}, [])
+q = Queue_of_orders({}, {}, {}, {}, [])
 
 
 def convert_to_route(text):

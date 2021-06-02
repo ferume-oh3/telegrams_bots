@@ -1,135 +1,188 @@
-import interaction
-import telebot
-from telebot import types
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from interaction import Queue, User, convert_to_route
+class User():
+    def __init__(self, role, id, route):
+        self.__id = id
+        self.__role = role
+        self.__route = route
+
+    def get_id(self):
+        return self.__id
+
+    def get_route(self):
+        return self.__route
+
+    def get_role(self):
+        return self.__role
 
 
 
-bot = telebot.TeleBot('')
-q = interaction.q
+class Queue_of_orders():
+    def __init__(self, used, orders_passengers, orders_drivers, already_find, stack_of_messages):
+        self.__used = used
+        self.__orders_passengers = orders_passengers
+        self.__orders_drivers = orders_drivers
+        self.__already_find = already_find
+        self.__stack_of_messages = stack_of_messages
+        self.__CONST_NUMBER_PLACES = 4
 
 
-@bot.message_handler(commands=['start'])
-def message_handler_st(message):
-    print_all_messages()
+    def add_driver(self, us):
+        self.__used[us.get_id()] = us
 
-    if not q.is_order(message.chat.id):
-        bot.send_message(message.chat.id,
-                         "Привет, я тестовый бот, попробую организовать функционал перевозки пассажиров "
-                         "между городами. \nНе вижу у вас открытых заказов :) \nДля начала определимся водитель ли вы или пассажир?",
-                         reply_markup=gen_markup_role())
-    else:
-        bot.send_message(message.chat.id,
-                         "Рады вас снова видеть, хотите уточнить детали ваших поездок?",
-                         reply_markup=gen_markup_check_order())
+        if us.get_route() in self.__orders_drivers:
+            self.__orders_drivers[us.get_route()].append(us)
+        else:
+            self.__orders_drivers[us.get_route()] = [us]
 
-    print_all_messages()
+        while q.may_build_trip(us.get_id()):
+            q.build_trip(us.get_id())
 
 
-@bot.message_handler(commands=['inform'])
-def message_handler_inform(message):
-    q.is_there(message.chat.id)
-    print_all_messages()
+    def add_passenger(self, us):
+        self.__used[us.get_id()] = us
+
+        if us.get_route() in self.__orders_passengers:
+            self.__orders_passengers[us.get_route()].append(us)
+        else:
+            self.__orders_passengers[us.get_route()] = [us]
+
+        while q.may_build_trip(us.get_id()):
+            q.build_trip(us.get_id())
 
 
-@bot.message_handler(commands=['cancel'])
-def message_handler_cancel(message):
-    print_all_messages()
-    if not q.is_order(message.chat.id):
-        bot.send_message(message.chat.id, "Насколько нам известно у вас отсутсвуют активные заказы!")
-    else:
-        q.delete_order(message.chat.id)
-        bot.send_message(message.chat.id, "Сделано!")
-
-    print_all_messages()
+    def get_inform(self, id):
+        if self.__used[id].get_role() == 0:
+            self.__stack_of_messages.append((1, id, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(list(map(str, already_find[id])))))
+        else:
+            self.__stack_of_messages.append((1, id, "Водитель нашелся, ниже приложен его номер\n" + '\n'.join(list(map(str, already_find[id])))))
 
 
-@bot.message_handler(content_types=['text'])
-def message_handler_any_message(message):
-    print_all_messages()
-    bot.send_message(message.chat.id,
-                     "Я вас не понимаю! Используйте команду /start для начала работы или /inform для получения информации по вашему заказу или /cancel для отмены заказа!")
+    def is_order(self, id):
+        if id not in self.__used:
+            return 0
+        else:
+            return 1
 
 
-def print_all_messages():
-    while q.is_there_message():
-        mes = q.get_first_message()
-        q.pop_first_message()
-        bot.send_message(mes[1], mes[2])
+    def is_there(self, id):
+        if not self.is_order(id):
+            self.__stack_of_messages.append((0, id, "Насколько нам известно у вас отсутсвуют активные заказы!"))
+            return
+
+        if id in self.__already_find:
+            self.get_inform(id);
+            return
+
+        route = self.__used[id].get_route()
+        if route not in self.__orders_drivers or len(self.__orders_drivers[route]) == 0:
+            self.__stack_of_messages.append((0, id, "К сожалению водитель пока не нашелся : ("))
+        elif route not in self.__orders_passengers:
+            self.__stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти " + str(self.__CONST_NUMBER_PLACES)))
+        elif len(self.__orders_passengers[route]) != self.__CONST_NUMBER_PLACES:
+            self.__stack_of_messages.append((0, id, "Недостаточно пассажиров, осталось найти " + str(self.__CONST_NUMBER_PLACES - len(self.__orders_passengers[route]))))
 
 
-def gen_markup_role():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Водитель", callback_data="cb_driver"),
-               InlineKeyboardButton("Пассажир", callback_data="cb_passenger"))
-    return markup
+    def inform_about_delete_of_driver(self, whom):
+        for v in whom:
+            self.__stack_of_messages.append((0, v, "Водитель отказался от поездки, ищем нового"))
 
 
-def gen_markup_order():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Уточнить", callback_data="cb_order"),
-               InlineKeyboardButton("Нет спасибо", callback_data="cb_no_order"))
-    return markup
+    def inform_about_delete_of_passenger(self, whom):
+        for v in whom:
+            self.__stack_of_messages.append((0, v, "Один из пассажиров отказался от поездки, ищем нового"))
 
 
-def gen_markup_check_order():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Уточнить", callback_data="cb_order"),
-               InlineKeyboardButton("Хочу отменить заказ", callback_data="cb_del_order"),
-               InlineKeyboardButton("Нет спасибо", callback_data="cb_no_order"))
-    return markup
+    def delete_order(self, id):
+        route = self.__used[id].get_route()
+
+        if self.__used[id].get_role() == 0:
+            if id in self.__already_find:
+                self.inform_about_delete_of_driver(self.__already_find[id])
+
+                for id_pas in self.__already_find[id]:
+                    self.__orders_passengers[route].append(self.__used[id_pas])
+                    self.__already_find.pop(id_pas, None)
+
+                self.__already_find.pop(id, None)
+                self.__used.pop(id, None)
+            else:
+                self.__orders_drivers[route].pop(self.__orders_drivers[route].index(self.__used[id]))
+                self.__used.pop(id, None)
+        else:
+            if id in self.__already_find:
+                fl = self.__already_find[self.__already_find[id][0]][::]
+                fl.pop(fl.index(id))
+                fl.append(self.__already_find[id][0])
+                self.inform_about_delete_of_passenger(fl)
+
+                id_dr = self.__already_find[id][0]
+                for id_pas in self.__already_find[id_dr]:
+                    if id_pas != id:
+                        self.__orders_passengers[route].append(self.__used[id_pas])
+
+                    self.__already_find.pop(id_pas, None)
+
+                self.__already_find.pop(id_dr, None)
+                self.__orders_drivers[route].append(self.__used[id_dr])
+                self.__used.pop(id, None)
+            else:
+                self.__orders_passengers[route].pop(self.__orders_passengers[route].index(self.__used[id]))
+                self.__used.pop(id, None)
+
+        while q.may_build_trip(id):
+            q.build_trip(id)
 
 
-@bot.callback_query_handler(func=lambda call: True)
-def callback_query(call):
-    if call.data == "cb_driver":
-        add_driver(call)
-        print_all_messages()
-    elif call.data == "cb_passenger":
-        add_passenger(call)
-    elif call.data == "cb_order":
-        check_order(call)
-        print_all_messages()
-    elif call.data == "cb_del_order":
-        q.delete_order(call.message.chat.id)
-        bot.answer_callback_query(call.id, "Сделано!")
-        print_all_messages()
-    elif call.data == "cb_no_order":
-        bot.answer_callback_query(call.id, "Хорошо, приятного тыкания )")
+    def may_build_trip(self, id):
+        if not self.is_order(id):
+            return 0
+
+        route = self.__used[id].get_route()
+        if route not in self.__orders_drivers or route not in self.__orders_passengers:
+            return 0
+
+        return len(self.__orders_drivers[route]) and len(self.__orders_passengers[route]) >= self.__CONST_NUMBER_PLACES
 
 
-def check_order(id):
-    q.is_there(id)
-    bot.answer_callback_query(id, "Готово")
+    def build_trip(self, id):
+        route = self.__used[id].get_route()
+
+        driver = self.__orders_drivers[route][0].id
+        self.__orders_drivers[route].pop(0)
+
+        list_of_pasengers = []
+        for i in range(self.__CONST_NUMBER_PLACES):
+            list_of_pasengers.append(self.__orders_passengers[route][0].id)
+            self.__orders_passengers[route].pop(0)
+
+        self.__already_find[driver] = list_of_pasengers
+        for v in list_of_pasengers:
+            self.__already_find[v] = [driver]
 
 
-def add_driver(call):
-    bot.answer_callback_query(call.id, "Запомню")
-    print_all_messages()
-    msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
-    bot.register_next_step_handler(msg, new_order_driver)
+        self.__stack_of_messages.append((1, driver, "Все пассажиры нашлись, ниже приложены их номера\n" + '\n'.join(
+            list(map(str, list_of_pasengers)))))
+
+        for v in list_of_pasengers:
+            self.__stack_of_messages.append((1, v, "Водитель нашелся, ниже приложен его номер\n" + str(driver)))
 
 
-def new_order_driver(message):
-    q.add_driver(User(0, message.chat.id, convert_to_route(message.text)))
-    print_all_messages()
-    msg = bot.send_message(message.chat.id, "Ваш заказ зарегистрирован! Пожалуйста проверяйте статус заказа!")
-    print_all_messages()
+    def is_there_message(self):
+        return len(self.__stack_of_messages) >= 1
 
 
-def add_passenger(call):
-    bot.answer_callback_query(call.id, "Запомню")
-    print_all_messages()
-    msg = bot.send_message(call.message.chat.id, "Введите откуда и куда вы хотите ехать, например Казань Уфа")
-    bot.register_next_step_handler(msg, new_order_passenger)
+    def get_first_message(self):
+        return self.__stack_of_messages[0]
 
 
-def new_order_passenger(message):
-    q.add_passenger(User(1, message.chat.id, convert_to_route(message.text)))
-    print_all_messages()
-    msg = bot.send_message(message.chat.id, "Ваш заказ зарегистрирован! Пожалуйста проверяйте статус заказа!")
-    print_all_messages()
+    def pop_first_message(self):
+        self.__stack_of_messages.pop(0)
+
+
+q = Queue_of_orders({}, {}, {}, {}, [])
+
+
+def convert_to_route(text):
+    # add exception about len(text) != 2
+    text = text.lower().split()
+    route = (text[0], text[1])
+    return route
