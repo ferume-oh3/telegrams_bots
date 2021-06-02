@@ -33,8 +33,8 @@ class Queue_of_orders():
         else:
             self.__orders_drivers[us.get_route()] = [us]
 
-        while q.may_build_trip(us.get_id()):
-            q.build_trip(us.get_id())
+        while self.may_build_trip(us.get_route()):
+            self.build_trip(us.get_route())
 
 
     def add_passenger(self, us):
@@ -45,8 +45,8 @@ class Queue_of_orders():
         else:
             self.__orders_passengers[us.get_route()] = [us]
 
-        while q.may_build_trip(us.get_id()):
-            q.build_trip(us.get_id())
+        while self.may_build_trip(us.get_route()):
+            self.build_trip(us.get_route())
 
 
     def get_inform(self, id):
@@ -128,24 +128,18 @@ class Queue_of_orders():
                 self.__orders_passengers[route].pop(self.__orders_passengers[route].index(self.__used[id]))
                 self.__used.pop(id, None)
 
-        while q.may_build_trip(id):
-            q.build_trip(id)
+        while self.may_build_trip(route):
+            self.build_trip(route)
 
 
-    def may_build_trip(self, id):
-        if not self.is_order(id):
-            return 0
-
-        route = self.__used[id].get_route()
+    def may_build_trip(self, route):
         if route not in self.__orders_drivers or route not in self.__orders_passengers:
             return 0
 
         return len(self.__orders_drivers[route]) and len(self.__orders_passengers[route]) >= self.__CONST_NUMBER_PLACES
 
 
-    def build_trip(self, id):
-        route = self.__used[id].get_route()
-
+    def build_trip(self, route):
         driver = self.__orders_drivers[route][0].id
         self.__orders_drivers[route].pop(0)
 
@@ -176,9 +170,6 @@ class Queue_of_orders():
 
     def pop_first_message(self):
         self.__stack_of_messages.pop(0)
-
-
-q = Queue_of_orders({}, {}, {}, {}, [])
 
 
 def convert_to_route(text):

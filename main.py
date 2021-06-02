@@ -1,7 +1,7 @@
-import reaction
+import reaction, telebot
+from reaction import trip_bot
 
-bot = reaction.bot
-q = reaction.q
+from interaction import Queue_of_orders
 
 
 # def add_test(kek):
@@ -26,4 +26,7 @@ q = reaction.q
 # add_test(user(1, 3, 'a', 'a', 1))
 
 if __name__ == '__main__':
-    bot.polling(none_stop=True, interval=0)
+    q = Queue_of_orders({}, {}, {}, {}, [])
+    bot = telebot.TeleBot()
+    mine_bot = trip_bot(q, bot)
+    mine_bot.bot_runner()
